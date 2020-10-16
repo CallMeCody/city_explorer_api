@@ -14,25 +14,51 @@ const app = express();
 app.use(express.static('./public'));
 
 const cors = require('cors');
+const { response } = require('express');
 app.use(cors());
 
 // the dotenv library lets us grab the PORT var from the .env using the magic words process.env.variableName
 const PORT = process.env.PORT || 3000;
 
 app.get('/location',(request, response) => {
-  let city = request.query.city;
-  let geoData = require('./data/location.json');
+  try{
+    let city = request.query.city;
+    let geoData = require('./data/location.json');
 
-  const obj = new Location(city, geoData);
-  console.log('from appget', city, geoData);
-  response.send(obj);
+    const obj = new Location(city, geoData);
+
+    response.send(obj);
+  }
+  catch(error){
+    console.log('ERROR', error);
+    response.status(500).send('It\'s not you it\'s us, we messed up.');
+  }
 })
 
-function Location(location, obj){
+app.get('/weather', (request, response) => {
+  let weatherData = require('./data/weather.json');
+
+  let weatherArray = [];
+  weatherData.data.forEach(weartherTime => {
+    weatherArray.push(new Weather(weartherTime));
+  })
+  response.send(weatherArray);
+})
+
+function Location(location, obj) {
   this.search_query = location;
   this.formatted_query = obj[0].display_name;
   this.latitude = obj[0].lat;
   this.longitude = obj[0].lon;
+}
+
+function Weather(obj){
+  this.time = obj.datetime;
+  this.forecast = obj.weather.description;
+}
+
+function Errors(){
+
 }
 
 // turn on the server
