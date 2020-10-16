@@ -17,15 +17,7 @@ const cors = require('cors');
 app.use(cors());
 
 // the dotenv library lets us grab the PORT var from the .env using the magic words process.env.variableName
-const PORT = process.env.PORT;
-
-// app.get('/', function (request, response) {
-//   response.send('Hello World');
-// });
-
-// app.get('/bananas', (request, response) => {
-//   response.send('I am bananas about bananas');
-// });
+const PORT = process.env.PORT || 3000;
 
 // turn on the server
 
