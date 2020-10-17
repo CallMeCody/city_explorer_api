@@ -27,32 +27,24 @@ app.get('/weather', weatherHandler);
 app.get('/trails', trailHandler);
 
 
-function locationHandler(request, response) {
-  let city = request.query.city;
-  const url = `https://us1.locationiq.com/v1/search.php`;
-
-  let queryParams = {
-    key: process.env.GEOCODE_API_KEY,
-    q: city,
-    format: 'json',
-    limit: 1
-  }
+function locationHandler(req, res) {
+  let city = req.query.city;
+  let key = process.env.GEOCODE_API_KEY;
+  const url = `https://us1.locationiq.com/v1/search.php?key=${key}$q=${city}$format=json`;
 
   superagent.get(url)
-    .query(queryParams)
     .then(results => {
-      let geoData = results.body;
-      const obj = new Location(city, geoData);
-      response.status(200).send(obj);
+      const location = new Location(city, results.body[0]);
+      res.status(200).json(location);
     })
     .catch((error) => {
       console.log('ERROR', error);
-      response.status(500).send('Our bad. Wheels aren\'t spinning!');
+      res.status(500).send('Our bad. Wheels aren\'t spinning!');
     })
 }
 
 function weatherHandler(request, response) {
-  let url = `http://api.weatherbit.io/v2.0/forecast/daily`;
+  let url = `https://api.weatherbit.io/v2.0/current`;
 
   let queryParams = {
     key: process.env.WEATHER_API_KEY,
@@ -101,11 +93,12 @@ function trailHandler(request, response) {
     })
 }
 
-function Location(location, obj) {
-  this.search_query = location;
-  this.formatted_query = obj[0].display_name;
-  this.latitude = obj[0].lat;
-  this.longitude = obj[0].lon;
+// Constructors
+function Location(city, locationData) {
+  this.search_query = city;
+  this.formatted_query = locationData[0].display_name;
+  this.latitude = locationData[0].lat;
+  this.longitude = locationData[0].lon;
 }
 
 function Weather(obj) {
@@ -125,13 +118,6 @@ function Trails(obj) {
   this.condition_date = new Date(obj.conditionDate).toDateString();
   this.condition_time = new Date(obj.conditionDate).toTimeString();
 }
-// app.get('/', function (request, response) {
-//   response.send('Hello World');
-// });
-
-// app.get('/bananas', (request, response) => {
-//   response.send('I am bananas about bananas');
-// });
 
 // turn on the server
 
