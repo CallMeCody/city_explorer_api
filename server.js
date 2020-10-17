@@ -3,7 +3,6 @@
 const express = require('express'); // express server library
 const cors = require('cors'); // bad bodyguard that allows everyone in
 const superagent = require('superagent');
-const { json } = require('express');
 
 // bring in the dotenv library
 // the job of this library is to find the .env file and get the variables out of it so we can use them in our JS file
