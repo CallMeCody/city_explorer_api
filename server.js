@@ -17,7 +17,7 @@ app.use(cors());
 // const { response } = require('express');
 
 // the dotenv library lets us grab the PORT var from the .env using the magic words process.env.variableName
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3005;
 
 
 app.get('/location', locationHandler);
@@ -27,24 +27,32 @@ app.get('/weather', weatherHandler);
 app.get('/trails', trailHandler);
 
 
-function locationHandler(req, res) {
-  let city = req.query.city;
-  let key = process.env.GEOCODE_API_KEY;
-  const url = `https://us1.locationiq.com/v1/search.php?key=${key}$q=${city}$format=json`;
+function locationHandler(request, response) {
+  let city = request.query.city;
+  let url = `https://us1.locationiq.com/v1/search.php`;
+
+  let queryParams = {
+    key: process.env.GEOCODE_API_KEY,
+    q: city,
+    format: 'json',
+    limit: 1
+  }
 
   superagent.get(url)
+    .query(queryParams)
     .then(results => {
-      const location = new Location(city, results.body[0]);
-      res.status(200).json(location);
+      let geoData = results.body;
+      const obj = new Location(city, geoData);
+      response.status(200).send(obj);
     })
     .catch((error) => {
       console.log('ERROR', error);
-      res.status(500).send('Our bad. Wheels aren\'t spinning!');
+      response.status(500).send('Our bad. Wheels aren\'t spinning!');
     })
 }
 
 function weatherHandler(request, response) {
-  let url = `https://api.weatherbit.io/v2.0/current`;
+  let url = `http://api.weatherbit.io/v2.0/forecast/daily`;
 
   let queryParams = {
     key: process.env.WEATHER_API_KEY,
@@ -93,12 +101,11 @@ function trailHandler(request, response) {
     })
 }
 
-// Constructors
-function Location(city, locationData) {
-  this.search_query = city;
-  this.formatted_query = locationData[0].display_name;
-  this.latitude = locationData[0].lat;
-  this.longitude = locationData[0].lon;
+function Location(location, obj) {
+  this.search_query = location;
+  this.formatted_query = obj[0].display_name;
+  this.latitude = obj[0].lat;
+  this.longitude = obj[0].lon;
 }
 
 function Weather(obj) {
