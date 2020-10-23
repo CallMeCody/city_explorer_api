@@ -1,5 +1,6 @@
 'use strict';
 
+
 const express = require('express'); // express server library
 const cors = require('cors'); // bad bodyguard that allows everyone in
 const superagent = require('superagent');
@@ -187,4 +188,3 @@ client.connect()
       console.log(`listening on ${PORT}`)
     })
   }).catch(err => console.log('ERROR', err));
-  
