@@ -1,6 +1,5 @@
 'use strict';
 
-
 const express = require('express'); // express server library
 const cors = require('cors'); // bad bodyguard that allows everyone in
 const superagent = require('superagent');
@@ -15,7 +14,7 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
-const client = new pg.Client(process.env.WINDOWS_DATABASE_URL);
+const client = new pg.Client(process.env.DATABASE_URL);
 client.on('error', err => {
   console.log('ERROR', err);
 });
@@ -27,33 +26,69 @@ client.on('error', err => {
 const PORT = process.env.PORT || 3001;
 
 
-app.get('/location', lookupDatabase);
+app.get('/location', locationHandler);
 
 app.get('/weather', weatherHandler);
 
 app.get('/trails', trailHandler);
 
-function lookupDatabase(request, response) {
-  let city = request.query.city;
-  let sql = 'SELECT * FROM locations;';
-  // `SELECT * FROM locations WHERE city=${request.query.city};`
-  client.query(sql)
-    .then(resultsFromPostgres => {
-      let storedLocation = resultsFromPostgres.rows;
-      let previousLocations = [];
-      storedLocation.forEach(obj => {
-        if (obj.city === city) {
-          previousLocations.push(obj);
-        }
-      })
-      if (previousLocations.length === 0) {
-        locationHandler(request, response);
-      }
-      else {
-        response.status(200).send(previousLocations[0]);
-        console.log('returned from storage: ', previousLocations[0]);
-      }
-    }).catch(err => console.log(err));
+app.get('/movies', movieHandler);
+
+app.get('/yelp', yelpHandler);
+
+
+function yelpHandler(request, response) {
+  // "name": "Umi Sake House",
+  //   "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/c-XwgpadB530bjPUAL7oFw/o.jpg",
+  //   "price": "$$   ",
+  //   "rating": "4.0",
+  //   "url": "https://www.yelp.com/biz/umi-sake-house-seattle?adjust_creative=uK0rfzqjBmWNj6-d3ujNVA&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=uK0rfzqjBmWNj6-d3ujNVA"
+  let url = `https://api.yelp.com/v3/businesses/search`;
+  const numPerPage = 5;
+  const page = request.query.page || 1;
+  const start = ((page - 1) * numPerPage);
+
+  let queryParams = {
+    latitude: request.query.latitude,
+    longitude: request.query.longitude,
+    term: 'restaurant',
+    offset: start,
+    limit: numPerPage
+  }
+
+  superagent.get(url)
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .query(queryParams)
+    .then(results => {
+      const resultsArray = results.body.businesses;
+      console.log('results', results.body);
+      const restaurantData = resultsArray.map(eatery => new Restaurant(eatery));
+      response.status(200).send(restaurantData);
+    })
+}
+
+function movieHandler(request, response) {
+  let city = request.query.search_query;
+  let url = `https://api.themoviedb.org/3/search/movie`;
+
+  let queryParams = {
+    api_key: process.env.MOVIE_API_KEY,
+    query: city,
+    page: 1
+  }
+
+  superagent.get(url)
+    .query(queryParams)
+    .then(results => {
+      let movieData = results.body.results.map(movie => {
+        return new Movies(movie);
+      });
+      response.status(200).send(movieData);
+    })
+    .catch((error) => {
+      console.log('ERROR', error);
+      response.status(500).send('We done messed it up.');
+    })
 }
 
 function locationHandler(request, response) {
@@ -67,28 +102,37 @@ function locationHandler(request, response) {
     limit: 1
   }
 
-  superagent.get(url)
-    .query(queryParams)
-    .then(results => {
-      let geoData = results.body;
-      const obj = new Location(city, geoData);
-      response.status(200).send(obj);
+  let sql = 'SELECT * FROM locations WHERE search_query=$1;';
+  let safeValues = [city];
 
-      let sql = 'INSERT INTO locations (city, formatted_city, latitude, longitude) VALUES ($1, $2, $3, $4) RETURNING id;';
-      let safeValues = [obj.search_query, obj.formatted_query, obj.latitude, obj.longitude];
+  client.query(sql, safeValues)
+    .then(resultsFromPostgres => {
+      if (resultsFromPostgres.rowCount) {
+        console.log('Found location in the database!');
+        let locationObject = resultsFromPostgres.rows[0];
+        response.status(200).send(locationObject);
+      }
+      else {
+        console.log('Did not find location in the database.');
+        superagent.get(url)
+          .query(queryParams)
+          .then(resultsFromSuperAgent => {
+            let geoData = resultsFromSuperAgent.body;
+            const obj = new Location(city, geoData);
 
-      client.query(sql, safeValues)
-        .then(resultsFromPostgres => {
-          let id = resultsFromPostgres.rows;
-          console.log('id is', id);
-        });
-    })
+            //save to database for later use
+            let sql = 'INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) RETURNING id;';
+            let safeValues = [obj.search_query, obj.formatted_query, obj.latitude, obj.longitude];
 
-    .catch((error) => {
-      console.log('ERROR', error);
-      response.status(500).send('Our bad. Wheels aren\'t spinning!');
-    })
+            client.query(sql, safeValues);
 
+            response.status(200).send(obj);
+          }).catch((error) => {
+            console.log('ERROR', error);
+            response.status(500).send('Our bad. Wheels aren\'t spinning!');
+          })
+      }
+    });
 }
 
 function weatherHandler(request, response) {
@@ -141,20 +185,6 @@ function trailHandler(request, response) {
     })
 }
 
-// function addToDatabase(request, response){
-//   let lat = request.query.latitude;
-//   let lon = request.query.latitude;
-
-//   let sql = 'INSERT INTO locations (latitude, longitude) VALUES ($1, $2) RETURNING id;';
-//   let safeValues = [lat, lon];
-
-//   client.query(sql, safeValues)
-//     .then(resultsFromPostgres => {
-//       let id = resultsFromPostgres.rows;
-//       console.log('id is',id);
-//     });
-// }
-
 //======================================== Constructors============================================
 function Location(location, obj) {
   this.search_query = location;
@@ -179,6 +209,24 @@ function Trails(obj) {
   this.conditions = obj.conditionDetails;
   this.condition_date = new Date(obj.conditionDate).toDateString();
   this.condition_time = new Date(obj.conditionDate).toTimeString();
+}
+
+function Movies(obj) {
+  this.title = obj.title;
+  this.overview = obj.overview;
+  this.average_votes = obj.vote_average;
+  this.total_votes = obj.vote_count;
+  this.image_url = `https://image.tmdb.org/t/p/w500${obj.poster_path}`;
+  this.popularity = obj.popularity;
+  this.released_on = obj.release_date;
+}
+
+function Restaurant(obj) {
+  this.name = obj.name;
+  this.image_url = obj.image_url;
+  this.price = obj.price;
+  this.rating = obj.rating;
+  this.url = obj.url;
 }
 
 //====================================== turn on the server========================================
