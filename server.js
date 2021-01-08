@@ -10,13 +10,9 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
-
 const client = new pg.Client(process.env.DATABASE_URL);
-client.on('error', err => {
-  console.log('ERROR', err);
-});
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 
 app.get('/location', locationHandler);
