@@ -1,16 +1,13 @@
 'use strict';
 
-const express = require('express'); // express server library
-const cors = require('cors'); // bad bodyguard that allows everyone in
+const express = require('express');
+const cors = require('cors');
 const superagent = require('superagent');
 const pg = require('pg');
 const { json } = require('express');
 
-// bring in the dotenv library
-// the job of this library is to find the .env file and get the variables out of it so we can use them in our JS file
 require('dotenv').config();
 
-// this gives us a variable that we can use to run all the methods that are in the express library
 const app = express();
 app.use(cors());
 
@@ -18,11 +15,7 @@ const client = new pg.Client(process.env.DATABASE_URL);
 client.on('error', err => {
   console.log('ERROR', err);
 });
-// this lets us serve a website from a directory
-// app.use(express.static('./public'));
-// const { response } = require('express');
 
-// the dotenv library lets us grab the PORT var from the .env using the magic words process.env.variableName
 const PORT = process.env.PORT || 3001;
 
 
@@ -38,11 +31,6 @@ app.get('/yelp', yelpHandler);
 
 
 function yelpHandler(request, response) {
-  // "name": "Umi Sake House",
-  //   "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/c-XwgpadB530bjPUAL7oFw/o.jpg",
-  //   "price": "$$   ",
-  //   "rating": "4.0",
-  //   "url": "https://www.yelp.com/biz/umi-sake-house-seattle?adjust_creative=uK0rfzqjBmWNj6-d3ujNVA&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=uK0rfzqjBmWNj6-d3ujNVA"
   let url = `https://api.yelp.com/v3/businesses/search`;
   const numPerPage = 5;
   const page = request.query.page || 1;
