@@ -86,7 +86,7 @@ function locationHandler(request, response) {
     limit: 1
   }
 
-  let sql = 'SELECT * FROM locations WHERE search_query=$1;';
+  let sql = 'SELECT * FROM locations WHERE search_query LIKE ($1);';
   let safeValues = [city];
 
   client.query(sql, safeValues)
